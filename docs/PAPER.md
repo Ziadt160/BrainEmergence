@@ -203,7 +203,7 @@ test-time method fills structured holes; only generative completion does.**
 
 ### 4.2 The decision map (Figure 1, `decision_map.png`)
 
-![decision map](figures/decision_map.png)
+![decision map](../figures/decision_map.png)
 
 Imagination's margin over the strongest compute-matched baseline, arranged by corruption-structure
 (rows, high → low) × data-redundancy (columns, low → high):

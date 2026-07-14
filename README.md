@@ -60,9 +60,9 @@ re-read it. `media/demo_brain_mnist.gif`
 
 ## What's genuinely real here
 
-- **A ~93% spiking MNIST classifier** ([`brain_predict.py`](brain_predict.py)) reading a "motor" zone,
-  and a **bidirectional spiking VAE** that recognizes *and* generates with shared weights
-  ([`brain_generate.py`](brain_generate.py)) — the engines behind the demos.
+- **A ~93% spiking MNIST classifier** ([`brain_predict.py`](brainemergence/brain_predict.py)) reading
+  a "motor" zone, and a **bidirectional spiking VAE** that recognizes *and* generates with shared
+  weights ([`brain_generate.py`](brainemergence/brain_generate.py)) — the engines behind the demos.
 - **A characterized robustness finding** (`imagine_robustness.py`, `imagine_noise.py`,
   `imagine_patterns.py`): top-down completion self-repairs *structured missing data* (occlusion,
   dropout) but **not noise** — "gaps, not grime" — and the benefit scales with data redundancy.
@@ -86,12 +86,12 @@ The receipts — every claim above has a figure. Highlights worth a look:
 - [**generate_samples.png**](figures/generate_samples.png) — a spiking network *dreaming* legible
   per-class digits, top-down, from nothing (the still behind `demo_dream.gif`).
 - [**energy_scoreboard.png**](figures/energy_scoreboard.png) — accuracy vs energy: the spiking brain
-  beats the CNN but a plain MLP is Pareto-optimal — the honest "why spiking?" answer ([`energy.py`](energy.py)).
+  beats the CNN but a plain MLP is Pareto-optimal — the honest "why spiking?" answer ([`energy.py`](brainemergence/energy.py)).
 - [**ablation_mnist_band.png**](figures/ablation_mnist_band.png) — decomposes the pipeline: the spiking
-  *classifier* is the weak link, not the generator ([`ablation.py`](ablation.py));
+  *classifier* is the weak link, not the generator ([`ablation.py`](brainemergence/ablation.py));
   [`cnn_pipeline_*`](figures/) shows a CNN base recovers it.
 - [**mask_control_mnist.png**](figures/mask_control_mnist.png) — the killer baseline: a *trivial*
-  mask-fill matches generative completion, deflating the headline ([`mask_control.py`](mask_control.py)).
+  mask-fill matches generative completion, deflating the headline ([`mask_control.py`](brainemergence/mask_control.py)).
 - [**decision_map.png**](figures/decision_map.png) + [**reconstructability.png**](figures/reconstructability.png)
   — the reconstructability rule and its quantitative test (ρ ≈ 0.44 — honest about being only partial).
 - [**semi_supervised_mnist.png**](figures/semi_supervised_mnist.png) — "generate-to-understand" *hurts*
@@ -101,11 +101,8 @@ The receipts — every claim above has a figure. Highlights worth a look:
 
 ## Repo map
 
-**Importable core** — [`brainemergence/`](brainemergence/) re-exports the reusable models &
-primitives behind a clean import surface: `from brainemergence import RecallBrain, BiBrain,
-ConvBrain, spike_func`. *(A thin facade — definitions stay in their original modules, some of which
-have intentionally diverged between experiments; consolidating live experiment code wasn't worth the
-risk of silently changing published figures.)*
+All code lives in the [`brainemergence/`](brainemergence/) package; run any script **from the repo
+root** (e.g. `python brainemergence/demo.py`). Grouped by role:
 
 **Demos & visualization**
 `demo.py` · `make_demo_video.py` (self-repair) · `make_dream_video.py` (generation) ·
@@ -137,10 +134,10 @@ risk of silently changing published figures.)*
 
 - **[BLOG.md](BLOG.md)** — *"I taught a spiking brain to imagine — then spent months proving it
   wasn't good enough."* The full honest story, start to finish (a good place to begin).
-- **[PAPER.md](PAPER.md)** — the write-up draft *(with an honest "do not submit as-is" banner: the
-  mask-aware control deflated the headline).*
-- **[HANDOFF.md](HANDOFF.md)** — the full internal state, results, and the critical updates.
-- **[PROPOSAL.md](PROPOSAL.md)** / **[PAPER_PLAN.md](PAPER_PLAN.md)** — earlier plans, kept for the story.
+- **[docs/PAPER.md](docs/PAPER.md)** — the write-up draft *(with an honest "do not submit as-is"
+  banner: the mask-aware control deflated the headline).*
+- **[docs/PROPOSAL.md](docs/PROPOSAL.md)** / **[docs/PAPER_PLAN.md](docs/PAPER_PLAN.md)** — earlier
+  plans, kept for the story.
 
 ## Run it
 
@@ -148,11 +145,13 @@ Python 3 + [`requirements.txt`](requirements.txt) (PyTorch, torchvision, numpy, 
 auto-download to `./data` on first run.
 
 ```bash
-python demo.py                       # the classic visual demo (CPU is fine)
-python make_demo_video.py --dataset fashion   # regenerate the self-repair animation
-python make_dream_video.py           # the "dreaming" animation
-python paper_exp1.py --dataset mnist --seeds 5   # the decision-rule experiment
+python brainemergence/demo.py                                # the classic visual demo (CPU is fine)
+python brainemergence/make_demo_video.py --dataset fashion   # regenerate the self-repair animation
+python brainemergence/make_dream_video.py                    # the "dreaming" animation
+python brainemergence/paper_exp1.py --dataset mnist --seeds 5   # the decision-rule experiment
 ```
+Always run from the **repo root** (not inside the package) — scripts read/write `figures/`, `media/`,
+and datasets relative to the root.
 
 ## The honest takeaway
 
