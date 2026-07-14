@@ -1,170 +1,196 @@
-# I taught a spiking "brain" to imagine — then spent months proving it wasn't good enough
+# Teaching a Spiking "Brain" to Imagine
 
-*An honest post-mortem of a solo AI project, built on a 4 GB laptop GPU, that answered its
-question instead of defending its thesis.*
+*The full story of a solo AI project — the idea, the build, what it can do, and what it honestly
+taught me when I tested it hard.*
 
 ---
 
-I started with a romantic idea: build a neural network that works a little more like a brain.
-Not a metaphor-brain — an actual **spiking** network, where neurons fire discrete pulses over
-time, wired into a 2D sheet with zones, the way cortex is. And I wanted it to do something
-brains are thought to do: **recognize things by imagining them.** Show it a corrupted image, and
-instead of just guessing, it would *reconstruct* what it expected to see, look again, and decide.
+## 1. The idea I couldn't let go of
 
-Perception as a loop. Analysis by synthesis. It's an old, beautiful idea.
+We usually build image classifiers as one-way machines: pixels go in, a label comes out. But that's
+not really how a brain seems to work. Brains *predict*. They fill in the blind spot, hallucinate the
+rest of a half-hidden face, "see" the word even when half the letters are smudged. Perception looks
+less like a lookup and more like a **loop** — a guess about the world, refined against what the eyes
+actually report. Philosophers and neuroscientists call it *analysis by synthesis*: to recognize
+something, imagine the thing that would have produced what you're seeing.
 
-Over a few months and about thirty experiments, I built it, and it worked — in the sense that it
-produced genuinely striking behavior. And then, one careful experiment at a time, I proved to
-myself that it wasn't actually better than much simpler methods. This is the story of that,
-because I think **the second half is the more useful half.**
+I wanted to build that. A network that, shown a corrupted image, doesn't just guess — it
+**reconstructs what it expects to see, looks again, and decides.** Perception as imagination.
 
-## The part that looked like magic
+And I wanted to build it the brain's way: with **spiking neurons** — units that fire discrete pulses
+over time instead of emitting smooth numbers — arranged in a 2D sheet with *zones*, the way cortex
+has sensory areas, association areas, and motor areas. The dream was a single system that could
+recognize, imagine, and maybe even organize itself into brain-like structure.
 
-Here's the thing I built, doing its trick. I take an image, delete a third of it — simulating a
-dead sensor — and the spiking network fires across its sheet, imagines the missing strip, and
-re-reads the object:
+That's the idea. The rest of this post is what happened when I actually built it — and then tested
+it more honestly than I wanted to.
+
+## 2. Building the brain
+
+The core is a **spiking recurrent sheet**. Each neuron integrates incoming current into a membrane
+voltage and fires a spike when it crosses a threshold. The catch: a spike is a step function, and
+step functions have no useful gradient, so you can't train them with ordinary backprop. The trick
+(a *surrogate gradient*) is to fire the hard spike on the forward pass but pretend it was a smooth
+curve on the backward pass. With that, the whole spiking sheet becomes trainable end to end.
+
+On top of that sheet I built two models:
+
+- **RecallBrain** — a network that does *both* jobs at once. It reads a class from a "motor" zone
+  (recognition) *and* reconstructs the image from a decoder (imagination). Recognize + imagine, one
+  network. Trained on clean digits, it reaches around **93%** accuracy — and, crucially, it can
+  regenerate what it sees.
+- **BiBrain** — the ambitious version: a **bidirectional, shared-weight** network. The *same* weight
+  matrix runs one way to perceive (image → concept) and the other way to imagine (concept → image).
+  One brain, run forwards and backwards.
+
+Getting a spiking network to *generate* was the hardest part, and it taught me something. My first
+version produced high-confidence garbage: it would respond to a "draw an oriented line" command with
+the right *magnitude* but a random *sign* every run — it had learned a convention and then flipped a
+coin on it. The fix was to let the encoder see the concept and to halve the feedback gain on the
+down-pass, so ordinary reconstruction pinned the convention. Suddenly it drew clean, correctly-formed
+images. Small bug, real lesson: when a generative model looks broken, check whether it's confidently
+doing the wrong thing, not failing to do anything.
+
+By the end, the system worked: it recognized, it imagined, and — as you'll see — it did some
+genuinely striking things.
+
+## 3. What it can do
+
+This is the fun part, and it's all **real model output**, not mock-ups.
+
+**It repairs its own perception.** Delete a third of an image — a dead-sensor simulation — and the
+spiking sheet fires, imagines the missing strip from context, and re-recognizes the object:
 
 ![self-repairing perception](media/demo_brain_fashion.gif)
 
-Every frame of that is the real trained model. No stored copy of the answer; it reconstructs the
-missing region from what it can still see, then recognizes it.
-
-And because the same network runs *both directions* — it can recognize *and* generate with one
-shared set of weights — it can also run with **no input at all.** Clamp a concept, let activity
-flow the other way through the sheet, and watch a digit form out of the spikes:
+**It dreams.** With *no input at all*, clamp a concept at the "motor" end and let activity flow down
+through the shared weights to the "eyes" — and a digit forms out of the spikes:
 
 ![the brain dreams](media/demo_dream.gif)
 
-Fix the *class* and sweep the latent "style," and it imagines the same digit in many
-handwritings — it has learned to separate *what* a thing is from *how* it's drawn:
+**It separates *what* from *how*.** Fix the class and sweep the latent "style," and it imagines the
+same digit in many handwritings — it has disentangled identity from style:
 
 ![one concept, many styles](media/demo_dream_styles3.gif)
 
-It felt like magic.
-
-**That's exactly when I got suspicious.**
-
-## The one rule I gave myself
-
-Here's the rule, and it's the most important thing in this whole post:
-
-> **Before you believe your idea works, run the experiment that could prove it doesn't.**
-
-Not after you write it up. Not "future work." First. The baseline a skeptical reviewer would
-reach for on their first read — you run *that*, and you run it honestly, and you let it win if it
-wins. Most of the value in this project came from obeying that rule even when I didn't want to.
-
-So I asked the obvious skeptical question: *does imagining the missing pixels actually beat just
-training the model on occluded images in the first place?*
-
-## Death by a thousand baselines
-
-**Round 1 — "just augment your data."** I trained the same classifier with occlusion
-augmentation and compared. Augmentation improved occluded accuracy by **+0.23**; my imagination
-loop, **+0.07** — and adding imagination on top of augmentation did *nothing*. A one-line
-reviewer comment ("why not just augment?") beat months of work, 3 to 1. The project looked dead.
-
-**Round 2 — the rescue.** But there was a real idea hiding in the wreckage. Augmentation can only
-prepare you for corruptions you *anticipated*. What about corruptions you didn't? I set up a
-**leave-one-corruption-out** test: train broad augmentation on every corruption *except* a
-held-out one, then, at *equal test-time compute*, compare feedforward vs. test-time augmentation
-vs. MEMO (a strong test-time-adaptation baseline) vs. my imagination loop — on the held-out
-corruption. And it **survived**: on unforeseen, structured missing-data, imagination beat all
-three, across MNIST, Fashion-MNIST, and CIFAR-10. There was even a gorgeous result — scattered
-pixel-dropout was a *loss* on sparse digits but the *biggest win* on rich natural images. Same
-corruption, opposite outcome, because redundancy makes the gaps fillable. I had a rule:
-*reconstructability = structure × redundancy.* I thought I had a paper.
-
-**Round 3 — the control I didn't want to run.** Then I noticed the confound. My imagination loop
-gets the **mask** — it knows *which* pixels are missing. My baselines didn't. So I gave a plain
-model the mask too, in the strongest form: trained with masking augmentation, mask as input. And
-the result was brutal: a **zero-parameter trick — just filling the hole with the average of the
-visible pixels — matched my generative model in 7 of 8 cases.** The headline was mostly "I had
-the mask and the baselines didn't." Only one narrow cell survived (large contiguous holes, where
-a blur-fill genuinely isn't enough).
-
-**Round 4 — the more ambitious version.** Maybe the wrong move was *repairing the input*; maybe I
-should classify *generatively* — pick the class whose imagined version best explains the image. On
-MNIST it looked spectacular (+0.41 over a naive baseline!). On a *fair* baseline it shrank, and on
-Fashion-MNIST it **didn't replicate at all.** A one-dataset win that dies on the second dataset
-isn't a result; it's noise with good PR.
-
-**Round 5 — its home turf.** "Generate to understand" is supposed to shine when labels are
-scarce. So I tested it semi-supervised, 100 labels. It didn't just fail to help — at the fewest
-labels it **actively hurt** (0.73 vs 0.76). Reconstruction is a weak learning signal; it drags the
-features toward pixels and away from the class.
-
-**Round 6 — the substrate itself.** Fine — is the brain-like part even pulling its weight? A
-plain CNN beat my spiking network on clean accuracy by **18 points**. And on energy — the one
-scoreboard where spiking is *supposed* to win — I measured it honestly (spikes → synaptic
-operations → joules) and found a plain MLP **dominates** the spiking brain: same accuracy, a third
-of the energy. Spiking only beat the *convolutional* net, which is a bar so low it doesn't count.
-
-![accuracy vs energy — the MLP is Pareto-optimal](figures/energy_scoreboard.png)
-
-**Round 7 — the original dream.** The whole project was named "BrainEmergence" for the hope that
-brain-like *structure* would emerge on its own. It doesn't. Topographic maps only appear if you
-*impose* them — I showed it three ways, including a falsification control. The map in the
-self-organization demo below is real, but it needs an explicit "fire together, move together" rule;
-it does **not** emerge from the dynamics:
+**And its neurons self-organize.** Give neurons movable positions and a simple "fire together, move
+together" rule, and a random cloud sorts itself into smooth orientation domains — a little
+cortex-like map:
 
 ![self-organizing map](media/demo_topo.gif)
 
-Seven rounds. Seven honest losses. Every time I gave the boring baseline a fair shot, it won.
+Beyond the demos, I ran a careful characterization of *when* the imagination actually helps
+perception, and it produced clean, reproducible findings:
 
-## The one thing that lived
+- **It fixes gaps, not grime.** Top-down completion self-repairs *structured missing data* —
+  occlusion, dropout, dead pixels — but it does **not** denoise. Under Gaussian noise it actually
+  hurts, because the feedforward path already learned to see through noise. "Gaps, not grime" became
+  a real, bounded claim.
+- **It scales with redundancy.** The help is larger on Fashion-MNIST than on sparse digits, and the
+  effect generalizes to natural CIFAR-10 images. There's even a beautiful reversal — scattered
+  pixel-dropout is a *loss* on sparse digits but the *biggest* win on rich images, because
+  redundancy makes scattered gaps reconstructable. It unifies into a tidy rule:
+  **reconstructability = structure × redundancy.**
 
-Stripped of everything that didn't survive, here is the honest, narrow, *true* finding:
+At this point I had a working brain-inspired model, four striking demos, and a characterized
+finding. It genuinely felt like something.
 
-> Test-time generative completion beats a trivial fill **only** when the missing region has
-> texture that averaging can't reproduce — and even then, the advantage *shrinks* as the
-> underlying classifier gets stronger.
+## 4. The harder question: is it actually *better*?
 
-That's it. It's small. It's also correct, reproducible, and — checked against a 2025 literature
-review — a slice nobody had characterized quite this way. A modest true thing is worth more than a
-big false one.
+Here's where I made the decision that shaped everything: before writing any of this up as a win, I'd
+run the experiment most likely to prove me wrong. **Run the killer baseline first.**
 
-## Where "brain-inspired" actually pays off (spoiler: not accuracy)
+The skeptic's question was obvious: *why imagine the missing pixels — why not just train on corrupted
+images?* So I did. Plain occlusion augmentation improved accuracy by +0.23; my imagination loop, by
++0.07 — and adding imagination on top of augmentation did nothing. Augmentation won, three to one. It
+stung.
 
-The most useful thing I learned is *where the whole family of ideas belongs.* I'd been grading
-brain-inspired models on a CNN's report card — accuracy — and that's the wrong scoreboard. Reading
-the current literature (topographic nets like TDANN and TopoLM; spiking transformers like
-Spikformer; the 2025 predictive-coding surveys; the Sensorium neural-prediction benchmarks), the
-pattern is consistent: **brain-inspired methods compete on *energy* (neuromorphic hardware), on
-*explaining neural data*, and on *biological plausibility* — almost never on raw accuracy.** My
-experiments "failing" on accuracy is exactly what that literature would predict. Spiking pays off
-on spiking hardware. That's not a disappointment; it's a map.
+But there was a real idea in the wreckage: augmentation only prepares you for corruptions you
+*anticipated*. So I built the fair test — **leave-one-corruption-out**, at *equal test-time compute*,
+against strong baselines (shift-augmentation and a test-time-adaptation method called MEMO). Train on
+every corruption except a held-out one; win on the held-out one. And it **survived** — across MNIST,
+Fashion-MNIST, *and* CIFAR-10, imagination beat all three baselines on unforeseen missing-data. The
+scattered-dropout reversal showed up right on cue. For a couple of days, I thought I had a paper.
 
-## What I actually learned
+Then I noticed the confound, and this is the part I'm proudest of, even though it hurt. My method
+quietly had an advantage the baselines didn't: it knew *which* pixels were missing — the mask. So I
+gave a plain model the mask too. And a **zero-parameter trick — just filling the hole with the
+average of the visible pixels — matched my generative model in seven of eight cases.** Most of the
+"win" was mask access, not imagination.
 
-- **Run the killer baseline first.** It's the difference between research and marketing. It cost
-  me my thesis and saved me from publishing something wrong.
-- **Negative results are results.** "Here's what doesn't work, and precisely why" is a
-  contribution — it saves the next person months.
-- **You can be right about the idea and wrong about the battlefield.** Generative perception is a
-  real, powerful idea; I kept aiming it at problems a cheap discriminative model already solves.
-- **Watch your confounds.** My best "win" was my method quietly having information the baselines
-  didn't. The mask. Always ask what your method knows that its opponent doesn't.
-- **Know when *not* to refactor.** Late on, I nearly "cleaned up" duplicated helper code — until I
-  noticed the copies had *diverged*, and merging them would have silently changed results I'd
-  already reported. Sometimes the disciplined move is to leave working code alone.
+I kept testing, because that's the job:
+
+- A fancier "classify by imagining which class best explains the image" looked spectacular on MNIST
+  (+0.41) and **didn't replicate** on Fashion-MNIST.
+- "Generate to understand" is supposed to shine with few labels — but at 100 labels it *hurt*.
+- A plain CNN beat the spiking net on accuracy by 18 points.
+- And on *energy* — spiking's home turf — I measured it honestly (spikes → operations → joules) and a
+  plain MLP **dominated** the spiking brain: same accuracy, a third of the energy. Spiking only beat
+  the convolutional net, which is a low bar.
+
+![accuracy vs energy — the MLP is Pareto-optimal](figures/energy_scoreboard.png)
+
+- And the original dream — that brain-like structure would *emerge* on its own? It doesn't. The
+  topographic map only forms when you impose an explicit rule; I confirmed that three ways, including
+  a control designed to falsify it.
+
+Seven honest tests. Every time I gave the simple baseline a fair shot, it held its own or won.
+
+## 5. What survived — and where this actually belongs
+
+Stripped to what's true, the surviving finding is small but real:
+
+> Test-time generative completion beats a trivial fill **only** when the missing region has texture
+> that averaging can't reproduce — and the advantage *shrinks* as the classifier gets stronger.
+
+That's honest, reproducible, and — checked against a 2025 literature review — a slice characterized
+this precisely nowhere else.
+
+And I learned the most useful thing of all: *I'd been keeping score on the wrong board.* I kept
+grading a brain-inspired model on a CNN's metric — raw accuracy. But that's not where these ideas
+live. Reading the current work — topographic networks (TDANN, TopoLM), spiking transformers
+(Spikformer), the 2025 predictive-coding surveys, the Sensorium neural-prediction benchmarks — the
+pattern is consistent: **brain-inspired methods compete on energy (neuromorphic hardware), on
+explaining neural data, and on biological plausibility — almost never on raw accuracy.** My results
+"losing" on accuracy is exactly what that literature predicts. Spiking pays off on spiking hardware.
+That's not a defeat; it's a map of where to point the idea next.
+
+## 6. What I actually built, and what I learned
+
+Let me be fair to the project, because the honest accounting cuts both ways.
+
+**What I built and stands up:** a spiking neural network that recognizes handwritten digits at ~93%,
+generates legible digits top-down from a shared-weight generative model, self-repairs occluded input
+by imagining the missing parts, and self-organizes into orientation domains — plus a careful,
+reproducible characterization of exactly when top-down completion helps ("gaps, not grime;
+reconstructability = structure × redundancy"). Every demo is real output; every claim has a figure.
+
+**What I learned:**
+
+- **Run the killer baseline first.** It's the line between research and marketing. It cost me a
+  headline and saved me from publishing something wrong.
+- **Negative results are results.** "Here's exactly what doesn't work, and why" saves the next person
+  months.
+- **You can be right about the idea and wrong about the battlefield.** Generative perception is real
+  and powerful; I aimed it at problems a cheap discriminative model already solves. The right
+  battlefield is unforeseen corruption — and neuromorphic hardware.
+- **Watch your confounds.** My best result was quietly built on information the baselines didn't
+  have. Always ask what your method knows that its opponent doesn't.
+- **Know when *not* to refactor, or over-claim.** Sometimes the disciplined move is to leave a
+  working thing alone and report it plainly.
 
 ## Was it worth it?
 
-I did not build a state-of-the-art anything. I built a spiking network that recognizes at ~93%,
-dreams legible digits, and repairs its own degraded perception — and then I demonstrated, seven
-different ways, that simpler methods do the actual job better. If you're keeping score on models,
-that's a loss.
+I didn't build a state-of-the-art anything, and I'm not going to pretend otherwise. But I built a
+brain-inspired system that genuinely recognizes, dreams, and repairs its own perception; I
+characterized where its one real advantage lives; and I tested the whole thing with the kind of
+honesty most projects skip — then wrote down the losses as plainly as the wins.
 
-But I don't think that's the score that matters. What I actually have is a way of working: I
-generate bold ideas *and* I kill them honestly, with the exact tests that would embarrass me if I
-skipped them. In a field full of confident overclaiming, that's the rarer skill — and it's the one
-I'd want a collaborator, or an employer, to see.
-
-The ideas were fun. Killing them cleanly was the point.
+The ideas were beautiful and the build was real. Testing them cleanly — and telling the truth about
+what I found — was the point.
 
 ---
 
-*Code, all thirty-odd experiments, and the demos above are in the repository. Everything is real
-model output; every claim has a figure; every negative result is reported as plainly as the
-positive ones.*
+*Code, all thirty-odd experiments, and the demos above are on GitHub. Everything is real model
+output; every claim has a figure; every negative result is reported as plainly as the positive
+ones.* → **github.com/Ziadt160/BrainEmergence**
