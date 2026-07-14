@@ -132,12 +132,10 @@ root** (e.g. `python brainemergence/demo.py`). Grouped by role:
 
 ## Docs
 
-- **[BLOG.md](BLOG.md)** — *"I taught a spiking brain to imagine — then spent months proving it
-  wasn't good enough."* The full honest story, start to finish (a good place to begin).
-- **[docs/PAPER.md](docs/PAPER.md)** — the write-up draft *(with an honest "do not submit as-is"
-  banner: the mask-aware control deflated the headline).*
-- **[docs/PROPOSAL.md](docs/PROPOSAL.md)** / **[docs/PAPER_PLAN.md](docs/PAPER_PLAN.md)** — earlier
-  plans, kept for the story.
+- **[docs/PAPER.md](docs/PAPER.md)** — the full write-up: the compute-matched, leave-one-out
+  study and the *reconstructability = structure × redundancy* decision rule, with an honest
+  status note on where the headline stands after the mask-aware control.
+- **[results_table.md](results_table.md)** — the headline results table (the receipts).
 
 ## Run it
 

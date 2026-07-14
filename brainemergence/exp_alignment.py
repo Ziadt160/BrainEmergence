@@ -1,5 +1,5 @@
 """
-exp_alignment.py  --  the de-risking experiment from PROPOSAL.md (E1 / E2a / E2b)
+exp_alignment.py  --  the de-risking experiment (E1 / E2a / E2b)
 =================================================================================
 Question: in a SHARED-WEIGHT, spatially-embedded SPIKING bidirectional network,
 does the top-down GENERATIVE pathway form an orientation map that ALIGNS with the
