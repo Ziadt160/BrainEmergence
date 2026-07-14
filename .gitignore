@@ -1,0 +1,14 @@
+# datasets (auto-download on first run)
+data/
+
+# python
+__pycache__/
+*.pyc
+
+# run logs / scratch
+run_*.log
+_*.py
+_frame*.png
+
+# personal launch copy (keep local, not in the public repo)
+SOCIAL.md

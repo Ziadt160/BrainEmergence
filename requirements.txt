@@ -1,0 +1,7 @@
+# BrainEmergence dependencies
+# Install CPU build:  pip install torch torchvision
+# (or a CUDA build of torch matching your GPU; everything also runs on CPU, just slower.)
+torch>=2.0
+torchvision>=0.15
+numpy>=1.24
+matplotlib>=3.6
